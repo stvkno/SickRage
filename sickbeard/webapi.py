@@ -182,54 +182,46 @@ class ApiHandler(RequestHandler):
 
         commands = None
         if args:
-            commands = args[0]
-            args = args[1:]
-
-        if "cmd" in kwargs:
-            commands = kwargs["cmd"]
-            del kwargs["cmd"]
+            commands, args = args[0], args[1:]
+        commands = kwargs.pop("cmd", commands)
 
         out_dict = {}
         if commands:
             commands = commands.split("|")
-            multi_commands = bool(len(commands) > 1)
+            multi_commands = len(commands) > 1
             for cmd in commands:
                 cur_args, cur_kwargs = self.filter_params(cmd, args, kwargs)
-                cmd_index = None
-                if len(cmd.split("_")) > 1:  # was a index used for this cmd ?
-                    cmd, cmd_index = cmd.split("_")  # this gives us the clear cmd and the index
+
+                cmd = cmd.split("_")  # was a index used for this cmd ?
+                cmd, cmd_index = cmd[0], cmd[1:]  # this gives us the clear cmd and the index
 
                 logger.log(u"API :: " + cmd + ": cur_kwargs " + str(cur_kwargs), logger.DEBUG)
-                if not (multi_commands and cmd in ('show.getbanner', 'show.getfanart', 'show.getnetworklogo', 'show.getposter')):  # skip these cmd while chaining
+                if not (cmd in ('show.getbanner', 'show.getfanart', 'show.getnetworklogo', 'show.getposter') and
+                        multi_commands):  # skip these cmd while chaining
                     try:
                         if cmd in function_mapper:
-                            # map function
-                            func = function_mapper.get(cmd)
-
-                            # add request handler to function
-                            func.rh = self
-
-                            # call function and get response back
-                            cur_out_dict = func(cur_args, cur_kwargs).run()
+                            func = function_mapper.get(cmd)  # map function
+                            func.rh = self  # add request handler to function
+                            cur_out_dict = func(cur_args, cur_kwargs).run()  # call function and get response
                         elif _is_int(cmd):
                             cur_out_dict = TVDBShorthandWrapper(cur_args, cur_kwargs, cmd).run()
                         else:
                             cur_out_dict = _responds(RESULT_ERROR, "No such cmd: '" + cmd + "'")
-                    except ApiError, e:  # Api errors that we raised, they are harmless
-                        cur_out_dict = _responds(RESULT_ERROR, msg=ex(e))
+                    except ApiError as error:  # Api errors that we raised, they are harmless
+                        cur_out_dict = _responds(RESULT_ERROR, msg=ex(error))
                 else:  # if someone chained one of the forbidden commands they will get an error for this one cmd
                     cur_out_dict = _responds(RESULT_ERROR, msg="The cmd '" + cmd + "' is not supported while chaining")
 
                 if multi_commands:
-                    # note: if multiple same commands are issued but one has not an index defined it will override all others
-                    # or the other way around, this depends on the order of the commands
-                    # this is not a bug
-                    if cmd_index is None:  # do we need a index dict for this cmd ?
-                        out_dict[cmd] = cur_out_dict
-                    else:
+                    # note: if duplicate commands are issued and one has an index defined it will override
+                    # all others or the other way around, depending on the command order
+                    # THIS IS NOT A BUG!
+                    if cmd_index:  # do we need an index dict for this cmd ?
                         if cmd not in out_dict:
                             out_dict[cmd] = {}
                         out_dict[cmd][cmd_index] = cur_out_dict
+                    else:
+                        out_dict[cmd] = cur_out_dict
                 else:
                     out_dict = cur_out_dict
 
