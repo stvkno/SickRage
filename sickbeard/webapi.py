@@ -17,7 +17,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with SickRage.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=W0223,E0202
+
+# TODO: break this up into separate files
+# pylint: disable=C0301,C0302
+# pylint: disable=E1101,E0202,C0111,C0103
 
 import io
 import os
@@ -65,8 +68,10 @@ from sickbeard.common import statusStrings
 try:
     import json
 except ImportError:
+    # pylint: disable=F0401
     import simplejson as json
 
+# pylint: disable=F0401
 from tornado.web import RequestHandler
 
 indexer_ids = ["indexerid", "tvdbid"]
@@ -270,6 +275,7 @@ class ApiHandler(RequestHandler):
 
 
 class ApiCall(ApiHandler):
+
     _help = {"desc": "This command is not documented. Please report this to the developers."}
 
     def __init__(self, args, kwargs):
@@ -750,8 +756,7 @@ class CMD_Episode(ApiCall):
         # convert stuff to human form
         if helpers.tryInt(episode['airdate'], 1) > 693595:  # 1900
             episode['airdate'] = sbdatetime.sbdatetime.sbfdate(sbdatetime.sbdatetime.convert_to_setting(
-                network_timezones.parse_date_time(int(episode['airdate']), show_obj.airs, show_obj.network)),
-                d_preset=dateFormat)
+                network_timezones.parse_date_time(int(episode['airdate']), show_obj.airs, show_obj.network)), d_preset=dateFormat)
         else:
             episode['airdate'] = 'Never'
 
