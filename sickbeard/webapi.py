@@ -158,7 +158,7 @@ class ApiHandler(RequestHandler):
         try:
             out = json.dumps(_dict, ensure_ascii=False, sort_keys=True)
             callback = self.get_query_argument('callback', None) or self.get_query_argument('jsonp', None)
-            if callback is not None:
+            if callback:
                 out = callback + '(' + out + ');'  # wrap with JSONP call if requested
         except Exception, e:  # if we fail to generate the output fake an error
             logger.log(u"API :: " + traceback.format_exc(), logger.DEBUG)
@@ -185,7 +185,7 @@ class ApiHandler(RequestHandler):
             del kwargs["cmd"]
 
         outDict = {}
-        if cmds is not None:
+        if cmds:
             cmds = cmds.split("|")
             multiCmds = bool(len(cmds) > 1)
             for cmd in cmds:
@@ -505,11 +505,9 @@ def _responds(result_type, data=None, msg=""):
     message is a human readable string, can be empty
     data is either a dict or a array, can be a empty dict or empty array
     """
-    if data is None:
-        data = {}
     return {"result": result_type_map[result_type],
             "message": msg,
-            "data": data}
+            "data": {} if not data else data}
 
 
 def _get_status_Strings(s):
@@ -742,14 +740,12 @@ class CMD_Episode(ApiCall):
         except ShowDirectoryNotFoundException:
             pass
 
-        if bool(self.fullPath) is True and showPath:
-            pass
-        elif bool(self.fullPath) is False and showPath:
+        if not showPath:  # show dir is broken ... episode path will be empty
+            episode["location"] = ""
+        elif not self.fullPath:
             # using the length because lstrip removes to much
             showPathLength = len(showPath) + 1  # the / or \ yeah not that nice i know
             episode["location"] = episode["location"][showPathLength:]
-        elif not showPath:  # show dir is broken ... episode path will be empty
-            episode["location"] = ""
 
         # convert stuff to human form
         if helpers.tryInt(episode['airdate'], 1) > 693595:  # 1900
@@ -863,11 +859,11 @@ class CMD_EpisodeSetStatus(ApiCall):
         ep_list = []
         if self.e:
             epObj = showObj.getEpisode(self.s, self.e)
-            if epObj is None:
+            if not epObj:
                 return _responds(RESULT_FAILURE, msg="Episode not found")
             ep_list = [epObj]
         else:
-            # get all episode numbers frome self,season
+            # get all episode numbers from self, season
             ep_list = showObj.getAllEpisodes(season=self.s)
 
         def _epResult(result_code, ep, msg=""):
@@ -2264,7 +2260,7 @@ class CMD_ShowDelete(ApiCall):
         """ Delete a show in SickRage """
         error, show = Show.delete(self.indexerid, self.removefiles)
 
-        if error is not None:
+        if error:
             return _responds(RESULT_FAILURE, msg=error)
 
         return _responds(RESULT_SUCCESS, msg='%s has been queued to be deleted' % show.name)
@@ -2429,7 +2425,7 @@ class CMD_ShowPause(ApiCall):
         """ Pause or unpause a show """
         error, show = Show.pause(self.indexerid, self.pause)
 
-        if error is not None:
+        if error:
             return _responds(RESULT_FAILURE, msg=error)
 
         return _responds(RESULT_SUCCESS, msg='%s has been %s' % (show.name, ('resumed', 'paused')[show.paused]))
@@ -2457,7 +2453,7 @@ class CMD_ShowRefresh(ApiCall):
         """ Refresh a show in SickRage """
         error, show = Show.refresh(self.indexerid)
 
-        if error is not None:
+        if error:
             return _responds(RESULT_FAILURE, msg=error)
 
         return _responds(RESULT_SUCCESS, msg='%s has queued to be refreshed' % show.name)
@@ -2558,7 +2554,7 @@ class CMD_ShowSeasons(ApiCall):
             sqlResults = myDB.select(
                 "SELECT name, episode, airdate, status, location, file_size, release_name, subtitles FROM tv_episodes WHERE showid = ? AND season = ?",
                 [self.indexerid, self.season])
-            if len(sqlResults) is 0:
+            if len(sqlResults) == 0:
                 return _responds(RESULT_FAILURE, msg="Season not found")
             seasons = {}
             for row in sqlResults:
@@ -2809,7 +2805,7 @@ class CMD_Shows(ApiCall):
         shows = {}
         for curShow in sickbeard.showList:
 
-            if self.paused is not None and bool(self.paused) != bool(curShow.paused):
+            if not self.paused and not curShow.paused:
                 continue
 
             indexerShow = helpers.mapIndexersToShow(curShow)
